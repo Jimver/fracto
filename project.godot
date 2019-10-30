@@ -16,7 +16,7 @@ _global_script_class_icons={
 [application]
 
 config/name="RayMarcher"
-run/main_scene="res://RayMarching/RayMarching_main.tscn"
+run/main_scene="res://fracto/fracto.tscn"
 config/icon="res://icon.png"
 
 [input]
@@ -72,4 +72,6 @@ camera_zoom_out={
 
 [rendering]
 
+quality/driver/driver_name="GLES2"
+threads/thread_model=2
 environment/default_environment="res://default_env.tres"

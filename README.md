@@ -1,8 +1,4 @@
-# Raymarching Godot
-
-## Screenshots
-
-![Screenshot](https://i.ibb.co/4TFsSjg/Godot-v3-1-1-stable-win64-39a-QBNrv-OR.png)
+# Fracto
 
 ## Build
 

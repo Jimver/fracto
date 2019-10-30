@@ -1,0 +1,261 @@
+[gd_scene load_steps=6 format=2]
+
+[ext_resource path="res://fracto/ColorRect.gd" type="Script" id=1]
+[ext_resource path="res://fracto/CameraMovement.gd" type="Script" id=2]
+[ext_resource path="res://fracto/FovSlider.gd" type="Script" id=3]
+
+[sub_resource type="Shader" id=1]
+code = "shader_type canvas_item;
+
+// Ray march variables
+uniform int MAX_STEPS = 100;
+uniform float MAX_DIST = 20;
+uniform float MIN_HIT_DIST = 0.0001;
+
+// Normal estimation variable
+uniform float DERIVATIVE_STEP = 0.00001;
+
+// Shading variables
+uniform float ambientCoeff = 0.1;
+uniform float diffuseCoeff = 0.9;
+uniform float specularCoeff = 1.0;
+uniform float specularExponent = 64.0;
+uniform vec3 lightPos = vec3(-5.0, 10.0, 0.0);
+
+// Camera variables
+uniform float fov = 45.0;
+uniform vec3 cameraPos = vec3(-5.0, 0.0, 0.0);
+uniform vec3 front = vec3(1.0, 0.0, 0.0);
+uniform vec3 up = vec3(0.0, 1.0, 0.0);
+
+// -------- Fractal variables --------
+// Mandelbub
+uniform int mandelBulbIterations = 5;
+uniform float mandelBulbBailout = 1.5;
+uniform float mandelBulbPower = 6.0;
+// Mandelbox
+uniform int mandelBoxIterations = 5;
+uniform float mandelBoxScale = 3;
+uniform float mandelBoxBailout = 20;
+uniform float mandelBoxFoldingLimit = 1.0;
+uniform float mandelBoxMinRadius = 0.5;
+uniform float mandelBoxFixedRadius = 1;
+
+// Plane distance function, p is position, n is the plane
+float sdPlane(vec3 p, vec4 n)
+{
+    // n must be normalized
+    return dot(p, n.xyz) + n.w;
+}
+
+// Sphere distance function, p is position, c is center, r is radius
+float sdSphere(vec3 p, vec3 c, float r)
+{
+    return length(c - p) - r;
+}
+
+// Mandel bulb distance function, p is position, iterations is #iterations, bailout is limit to break, power is fractal power (8 is standard)
+float sdMandelBulb(vec3 p, int iterations, float bailout, float power)
+{
+	vec3 z = p;
+	float dr = 1.0;
+	float r = 0.0;
+	float theta, phi, zr = 0.0;
+	for (int i = 0; i < iterations ; i++) {
+		r = length(z);
+		if (r > bailout) break;
+		
+		// convert to polar coordinates
+		theta = acos(z.z / r);
+		phi = atan(z.y, z.x);
+		dr =  pow(r, power - 1.0) * power * dr + 1.0;
+		
+		// scale and rotate the point
+		zr = pow(r, power);
+		theta = theta * power;
+		phi = phi * power;
+		
+		// convert back to cartesian coordinates and add p
+		z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta)) + p;
+	}
+	return 0.5 * log(r) * r / dr;
+}
+
+// Distance function for mandel box, p is position, iterations is # iterations, scale is scale of mandelbox, bailout is limit to break
+// http://www.fractalforums.com/3d-fractal-generation/a-mandelbox-distance-estimate-formula/msg21412/#msg21412
+float sdMandelBox(vec3 p, int iterations, float scale, float bailout, float foldingLimit, float minRadius, float fixedRadius)
+{
+	float MR2 = minRadius * minRadius;
+	
+	// precomputed somewhere
+	vec4 scalevec = vec4(scale, scale, scale, abs(scale)) / MR2;
+	float C1 = abs(scale-1.0), C2 = pow(abs(scale), float(1-iterations));
+
+	// distance estimate
+	vec4 pos = vec4(p.xyz, 1.0), p0 = vec4(p.xyz, 1.0);  // p.w is knighty's DEfactor
+	for (int i = 0; i < iterations; i++) {
+		pos.xyz = clamp(pos.xyz, -foldingLimit, foldingLimit) * 2.0 - pos.xyz;  // box fold: min3, max3, mad3
+		float r2 = dot(pos.xyz, pos.xyz);  // dp3
+		pos.xyzw *= clamp(max(MR2 / r2, MR2), 0.0, 1.0);  // sphere fold: div1, max1.sat, mul4
+		pos.xyzw = pos * scalevec + p0;  // mad4
+	}
+	return (length(pos.xyz) - C1) / pos.w - C2;
+}
+
+// Distance function combined
+float sdf(vec3 p)
+{
+	// All sd functions must be inside the min
+    //float res = min(
+		//sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower),
+        //sdSphere(p, vec3( 1.0, 0.0, 0.0), 1.0)
+	//);
+    //return sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower);
+	return sdMandelBox(p, mandelBoxIterations, mandelBoxScale, mandelBoxBailout, mandelBoxFoldingLimit, mandelBoxMinRadius, mandelBoxFixedRadius);
+}
+
+// Estimate normal by hitting rays from (position) and (position +- delta)
+vec3 estimateNormal(vec3 p) 
+{
+    return normalize(vec3(
+        sdf(vec3(p.x + DERIVATIVE_STEP, p.y, p.z)) - sdf(vec3(p.x - DERIVATIVE_STEP, p.y, p.z)),
+        sdf(vec3(p.x, p.y + DERIVATIVE_STEP, p.z)) - sdf(vec3(p.x, p.y - DERIVATIVE_STEP, p.z)),
+        sdf(vec3(p.x, p.y, p.z  + DERIVATIVE_STEP)) - sdf(vec3(p.x, p.y, p.z - DERIVATIVE_STEP))
+    ));
+}
+
+// Blinn Phong shading
+vec3 blinnPhong(vec3 position, vec3 lightPosition, vec3 ambient, vec3 diffuse, vec3 normal)
+{
+    vec3 toEye = normalize(cameraPos - position);
+    vec3 toLight = normalize(lightPosition - position);
+    // vec3 reflection = reflect(-toLight, normal); // uncomment for Phong model
+    vec3 halfwayDir = normalize(toLight + toEye);
+    
+    vec3 ambientFactor = ambient * ambientCoeff;
+    vec3 diffuseFactor = diffuse * max(0.0, dot(normal, toLight));
+    // vec3 specularFactor = diffuse * pow(max(0.0, dot(toEye, reflection)), specularExponent)
+    //                     * specularCoeff; // uncomment for Phong model
+    vec3 specularFactor = diffuse * pow(max(0.0, dot(normal, halfwayDir)), specularExponent)
+                        * specularCoeff;
+    
+    return ambientFactor + diffuseFactor + specularFactor;
+}
+
+// Ray marcher
+vec3 raymarch(vec3 rayDir)
+{
+    vec3 ambientColor = vec3(1.0, 1.0, 1.0);
+	vec3 hitColor = vec3(1.0, 1.0, 1.0);
+	vec3 missColor = vec3(0.0, 0.0, 0.0);
+	
+	float depth = 0.0;
+	float minDist = MAX_DIST;
+	for (int i = 0; depth < MAX_DIST && i < MAX_STEPS; ++i)
+	{
+		vec3 pos = cameraPos + rayDir * depth;
+		float dist = sdf(pos);
+		minDist = min(minDist, dist);
+		if (dist < MIN_HIT_DIST) {
+            vec3 normal = estimateNormal(pos);
+            vec3 lightingColor = blinnPhong(pos, lightPos, normal, hitColor, normal);
+            
+			return lightingColor;
+		}
+		depth += dist;
+	}
+    return missColor;
+}
+
+// Ray calculator
+vec3 getRayDirection(vec2 resolution, vec2 uv)
+{
+	float aspect = resolution.x / resolution.y;
+	float fov2 = radians(fov) / 2.0;
+	
+	// convert coordinates from [0, 1] to [-1, 1]
+	// and invert y axis to flow from bottom to top
+	vec2 screenCoord = (uv - 0.5) * 2.0;
+	screenCoord.x *= aspect;
+	screenCoord.y = -screenCoord.y;
+	
+	vec2 offsets = screenCoord * tan(fov2);
+	
+	vec3 rayFront = normalize(front);
+	vec3 rayRight = normalize(cross(rayFront, normalize(up)));
+	vec3 rayUp = cross(rayRight, rayFront);
+	vec3 rayDir = rayFront + rayRight * offsets.x + rayUp * offsets.y;
+	
+	return normalize(rayDir);
+}
+
+// Fragment shader
+void fragment()
+{
+	vec2 resolution = 1.0 / SCREEN_PIXEL_SIZE;
+	
+	vec3 rayDir = getRayDirection(resolution, UV);
+	COLOR = vec4(raymarch(rayDir), 1.0);
+}
+"
+
+[sub_resource type="ShaderMaterial" id=2]
+shader = SubResource( 1 )
+shader_param/MAX_STEPS = 100
+shader_param/MAX_DIST = 20.0
+shader_param/MIN_HIT_DIST = 0.0001
+shader_param/DERIVATIVE_STEP = 0.0001
+shader_param/ambientCoeff = 0.2
+shader_param/diffuseCoeff = 0.9
+shader_param/specularCoeff = 1.0
+shader_param/specularExponent = 64.0
+shader_param/lightPos = Vector3( 0, 5, 0 )
+shader_param/fov = 45.0
+shader_param/cameraPos = Vector3( -5, 0, 0 )
+shader_param/front = Vector3( 1, 0, 0 )
+shader_param/up = Vector3( 0, 1, 0 )
+shader_param/mandelBulbIterations = 5
+shader_param/mandelBulbBailout = 1.5
+shader_param/mandelBulbPower = 6.0
+shader_param/mandelBoxIterations = 5
+shader_param/mandelBoxScale = 3.0
+shader_param/mandelBoxBailout = 20.0
+shader_param/mandelBoxFoldingLimit = 1.0
+shader_param/mandelBoxMinRadius = 0.5
+shader_param/mandelBoxFixedRadius = 1.0
+
+[node name="Node" type="Node"]
+
+[node name="Control" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+rect_rotation = -0.042723
+
+[node name="ColorRect" type="ColorRect" parent="Control"]
+material = SubResource( 2 )
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 1 )
+
+[node name="CameraMovement" type="Node" parent="Control/ColorRect"]
+script = ExtResource( 2 )
+
+[node name="UI" type="Control" parent="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 1.75943
+margin_top = -1.75678
+margin_right = 1.7594
+margin_bottom = -1.75677
+
+[node name="FovSlider" type="VSlider" parent="Control/UI"]
+margin_right = 32.0
+margin_bottom = 128.0
+min_value = 15.0
+max_value = 135.0
+step = 0.01
+value = 45.0
+tick_count = 10
+ticks_on_borders = true
+script = ExtResource( 3 )
+colorRect = NodePath("../../ColorRect")

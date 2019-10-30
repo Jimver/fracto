@@ -1,7 +1,7 @@
 extends Node
 
-export(float) var MOUSE_SENSITIVITY = 0.05
-export(float) var MAX_VELOCITY = 300
+export(float) var MOUSE_SENSITIVITY = 0.1
+export(float) var MAX_VELOCITY = 50
 
 var velocity: Vector3 = Vector3()
 var mouseOffsets: Vector2 = Vector2()
