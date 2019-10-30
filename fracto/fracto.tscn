@@ -106,12 +106,12 @@ float sdMandelBox(vec3 p, int iterations, float scale, float bailout, float fold
 float sdf(vec3 p)
 {
 	// All sd functions must be inside the min
-    //float res = min(
-		//sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower),
+    float res = min(
+		sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower),
+		sdMandelBox(p, mandelBoxIterations, mandelBoxScale, mandelBoxBailout, mandelBoxFoldingLimit, mandelBoxMinRadius, mandelBoxFixedRadius)
         //sdSphere(p, vec3( 1.0, 0.0, 0.0), 1.0)
-	//);
-    //return sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower);
-	return sdMandelBox(p, mandelBoxIterations, mandelBoxScale, mandelBoxBailout, mandelBoxFoldingLimit, mandelBoxMinRadius, mandelBoxFixedRadius);
+	);
+	return res;
 }
 
 // Estimate normal by hitting rays from (position) and (position +- delta)
