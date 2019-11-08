@@ -19,6 +19,10 @@ config/name="RayMarcher"
 run/main_scene="res://fracto/fracto.tscn"
 config/icon="res://icon.png"
 
+[display]
+
+window/size/resizable=false
+
 [input]
 
 camera_forward={

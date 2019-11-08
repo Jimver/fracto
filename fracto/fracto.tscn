@@ -9,18 +9,15 @@ code = "shader_type canvas_item;
 
 // Ray march variables
 uniform int MAX_STEPS = 100;
-uniform float MAX_DIST = 20;
-uniform float MIN_HIT_DIST = 0.0001;
-
-// Normal estimation variable
-uniform float DERIVATIVE_STEP = 0.00001;
+uniform float MAX_DIST = 40;
+uniform float MIN_HIT_DIST = 0.001;
 
 // Shading variables
-uniform float ambientCoeff = 0.1;
-uniform float diffuseCoeff = 0.9;
-uniform float specularCoeff = 1.0;
-uniform float specularExponent = 64.0;
-uniform vec3 lightPos = vec3(-5.0, 10.0, 0.0);
+uniform float ambientCoeff = 0.3;
+uniform float diffuseCoeff = 0.3;
+uniform float specularCoeff = 0.3;
+uniform float specularExponent = 8.0;
+uniform vec3 lightPos = vec3(-5.0, 5.0, 0.0);
 
 // Camera variables
 uniform float fov = 45.0;
@@ -106,17 +103,20 @@ float sdMandelBox(vec3 p, int iterations, float scale, float bailout, float fold
 float sdf(vec3 p)
 {
 	// All sd functions must be inside the min
-    float res = min(
+    float res = min(min(
 		sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower),
-		sdMandelBox(p, mandelBoxIterations, mandelBoxScale, mandelBoxBailout, mandelBoxFoldingLimit, mandelBoxMinRadius, mandelBoxFixedRadius)
-        //sdSphere(p, vec3( 1.0, 0.0, 0.0), 1.0)
-	);
+		//10000
+		//sdMandelBox(p, mandelBoxIterations, mandelBoxScale, mandelBoxBailout, mandelBoxFoldingLimit, mandelBoxMinRadius, mandelBoxFixedRadius)
+        sdSphere(p, lightPos + vec3(1, 0, 0), 0.5)
+	), sdSphere(p, lightPos + vec3(-1, 0, 0), 0.5));
 	return res;
 }
 
 // Estimate normal by hitting rays from (position) and (position +- delta)
 vec3 estimateNormal(vec3 p) 
 {
+	// Normal estimation variable
+	float DERIVATIVE_STEP = 0.00001;
     return normalize(vec3(
         sdf(vec3(p.x + DERIVATIVE_STEP, p.y, p.z)) - sdf(vec3(p.x - DERIVATIVE_STEP, p.y, p.z)),
         sdf(vec3(p.x, p.y + DERIVATIVE_STEP, p.z)) - sdf(vec3(p.x, p.y - DERIVATIVE_STEP, p.z)),
@@ -140,6 +140,7 @@ vec3 blinnPhong(vec3 position, vec3 lightPosition, vec3 ambient, vec3 diffuse, v
                         * specularCoeff;
     
     return ambientFactor + diffuseFactor + specularFactor;
+	//return ambientFactor + specularFactor;
 }
 
 // Ray marcher
@@ -202,14 +203,13 @@ void fragment()
 [sub_resource type="ShaderMaterial" id=2]
 shader = SubResource( 1 )
 shader_param/MAX_STEPS = 100
-shader_param/MAX_DIST = 20.0
-shader_param/MIN_HIT_DIST = 0.0001
-shader_param/DERIVATIVE_STEP = 0.0001
-shader_param/ambientCoeff = 0.2
-shader_param/diffuseCoeff = 0.9
-shader_param/specularCoeff = 1.0
-shader_param/specularExponent = 64.0
-shader_param/lightPos = Vector3( 0, 5, 0 )
+shader_param/MAX_DIST = 40.0
+shader_param/MIN_HIT_DIST = 0.001
+shader_param/ambientCoeff = 0.3
+shader_param/diffuseCoeff = 0.3
+shader_param/specularCoeff = 0.3
+shader_param/specularExponent = 8.0
+shader_param/lightPos = Vector3( -5, 5, 0 )
 shader_param/fov = 45.0
 shader_param/cameraPos = Vector3( -5, 0, 0 )
 shader_param/front = Vector3( 1, 0, 0 )
