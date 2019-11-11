@@ -17,7 +17,7 @@ uniform float ambientCoeff = 0.3;
 uniform float diffuseCoeff = 0.3;
 uniform float specularCoeff = 0.3;
 uniform float specularExponent = 8.0;
-uniform vec3 lightPos = vec3(-5.0, 5.0, 0.0);
+uniform vec3 lightPos = vec3(-5.0, 10.0, 0.0);
 
 // Camera variables
 uniform float fov = 45.0;
@@ -104,9 +104,9 @@ float sdf(vec3 p)
 {
 	// All sd functions must be inside the min
     float res = min(min(
-		sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower),
-		//10000
-		//sdMandelBox(p, mandelBoxIterations, mandelBoxScale, mandelBoxBailout, mandelBoxFoldingLimit, mandelBoxMinRadius, mandelBoxFixedRadius)
+		//sdMandelBulb(p, mandelBulbIterations, mandelBulbBailout, mandelBulbPower),
+		//10000,
+		sdMandelBox(p, mandelBoxIterations, mandelBoxScale, mandelBoxBailout, mandelBoxFoldingLimit, mandelBoxMinRadius, mandelBoxFixedRadius),
         sdSphere(p, lightPos + vec3(1, 0, 0), 0.5)
 	), sdSphere(p, lightPos + vec3(-1, 0, 0), 0.5));
 	return res;
@@ -209,7 +209,7 @@ shader_param/ambientCoeff = 0.3
 shader_param/diffuseCoeff = 0.3
 shader_param/specularCoeff = 0.3
 shader_param/specularExponent = 8.0
-shader_param/lightPos = Vector3( -5, 5, 0 )
+shader_param/lightPos = Vector3( -5, 10, 0 )
 shader_param/fov = 45.0
 shader_param/cameraPos = Vector3( -5, 0, 0 )
 shader_param/front = Vector3( 1, 0, 0 )
