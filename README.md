@@ -4,6 +4,9 @@
 
 Download and unzip this repository. Then download [Godot](https://godotengine.org/download) Game Engine. Open the project via Godot and run it.
 
+## Controls
+Use WASD to move around, Q and E to control elevation and the mouse to point the camera. Use the scroll wheel of the mouse to zoom in/out.
+
 ## Screenshots
 ![Mandelbulb](images/mandelbulb.png?raw=true "Mandelbulb")
 
