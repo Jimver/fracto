@@ -1,5 +1,7 @@
 # Fracto
 
+This is a real time ray marching renderer that renders fractals in 3D. Currently the Mandelbulb and Mandelbox fractals are implemented.
+
 ## Build
 
 Download and unzip this repository. Then download [Godot](https://godotengine.org/download) Game Engine. Open the project via Godot and run it.
